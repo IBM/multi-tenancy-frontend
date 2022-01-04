@@ -96,9 +96,9 @@ kubectl create secret generic appid.client-id-fronted \
 
 #####################
 
-BACKEND_ADDRESS="${IBMCLOUD_IKS_CLUSTER_NAMESPACE}.service-backend"
+BACKEND_IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
 BACKEND_PORT=$(kubectl get service -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "service-backend" -o json | jq -r '.spec.ports[0].nodePort')
-SERVICE_CATALOG_URL="http://${BACKEND_ADDRESS}:${BACKEND_PORT}"
+SERVICE_CATALOG_URL="http://${BACKEND_IP_ADDRESS}:${BACKEND_PORT}"
 
 #####################
 
