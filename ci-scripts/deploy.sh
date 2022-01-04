@@ -100,12 +100,15 @@ BACKEND_ADDRESS="${IBMCLOUD_IKS_CLUSTER_NAMESPACE}.service-backend"
 BACKEND_PORT=$(kubectl get service -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "service-backend" -o json | jq -r '.spec.ports[0].nodePort')
 SERVICE_CATALOG_URL="http://${BACKEND_ADDRESS}:${BACKEND_PORT}"
 
+#--env VUE_APP_API_URL_CATEGORIES="$SERVICE_CATALOG_URL/base/category" \
 #--env VUE_APP_API_URL_PRODUCTS="$SERVICE_CATALOG_URL/base/category" \
 #--env VUE_APP_API_URL_ORDERS="$SERVICE_CATALOG_URL/base/customer/Orders" \
-#--env VUE_APP_API_URL_CATEGORIES="$SERVICE_CATALOG_URL/base/category" \
 #--env VUE_APP_CATEGORY_NAME="$(params.APPLICATION_CATEGORY)" \
 #--env VUE_APP_HEADLINE="$(params.APPLICATION_CONTAINER_NAME_FRONTEND)" \
 #--env VUE_APP_ROOT="/" \
+
+
+
 
 #set_env APPLICATION_CONTAINER_NAME_BACKEND "${APPLICATION_CONTAINER_NAME_BACKEND}"
 #set_env APPLICATION_CONTAINER_NAME_FRONTEND "${APPLICATION_CONTAINER_NAME_FRONTEND}"
@@ -137,8 +140,8 @@ IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] 
 PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
 
 echo "Application URL: http://${IP_ADDRESS}:${PORT}"
-echo -n "http://${IP_ADDRESS}:${PORT}" > ../app-url
 
+ADD_REDIRECT_URIS="add-redirecturis.json"
 FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
 sed "s+APPLICATION_REDIRECT_URL+$FRONTEND_URL+g" ./deployments/add-redirecturis-template.json > ./$ADD_REDIRECT_URIS
 result=$(curl -d @./$ADD_REDIRECT_URIS -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)

@@ -25,7 +25,19 @@ spec:
           valueFrom:
             secretKeyRef:
               name: appid.client-id-fronted
-              key: VUE_APPID_CLIENT_ID        
+              key: VUE_APPID_CLIENT_ID       
+        - name: VUE_APP_API_URL_CATEGORIES
+          value: "VUE_APP_API_URL_CATEGORIES_VALUE" 
+        - name: VUE_APP_API_URL_PRODUCTS
+          value: "VUE_APP_API_URL_PRODUCTS_VALUE" 
+        - name: VUE_APP_API_URL_ORDERS
+          value: "VUE_APP_API_URL_ORDERS_VALUE" 
+        - name: VUE_APP_CATEGORY_NAME
+          value: "VUE_APP_CATEGORY_NAME_VALUE" 
+        - name: VUE_APP_HEADLINE
+          value: "VUE_APP_HEADLINE_VALUE" 
+        - name: VUE_APP_ROOT
+          value: "/" 
         ports:
         - containerPort: 8080
         livenessProbe:
