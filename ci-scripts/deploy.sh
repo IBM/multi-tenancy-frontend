@@ -137,10 +137,8 @@ IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] 
 PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
 
 echo "Application URL: http://${IP_ADDRESS}:${PORT}"
-
 echo -n "http://${IP_ADDRESS}:${PORT}" > ../app-url
 
-
-
-#sed "s+APPLICATION_REDIRECT_URL+$FRONTEND_URL+g" ./appid-configs/add-redirecturis-template.json > ./$ADD_REDIRECT_URIS
-#result=$(curl -d @./$ADD_REDIRECT_URIS -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $MANAGEMENTURL/config/redirect_uris)
+FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
+sed "s+APPLICATION_REDIRECT_URL+$FRONTEND_URL+g" ./deployments/add-redirecturis-template.json > ./$ADD_REDIRECT_URIS
+result=$(curl -d @./$ADD_REDIRECT_URIS -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
