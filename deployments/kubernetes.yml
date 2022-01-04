@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-frontend
+  template:
+    metadata:
+      labels:
+        app: service-frontend
+    spec:
+      containers:
+      - name: service-frontend
+        image: IMAGE_NAME
+        env:
+        - name: VUE_APPID_DISCOVERYENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: appid.discovery-endpoint
+              key: VUE_APPID_DISCOVERYENDPOINT
+        - name: VUE_APPID_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: appid.client-id-fronted
+              key: VUE_APPID_CLIENT_ID        
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "curl -s http://localhost:8080"]
+          initialDelaySeconds: 20
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "curl -s http://localhost:8080"]
+          initialDelaySeconds: 40
+      restartPolicy: Always     
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-frontend
+  labels:
+    app: service-frontend
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      name: http
+  selector:
+    app: service-frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-frontend-cip
+  labels:
+    app: service-frontend-cip
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: service-frontend
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: service-frontend
+spec:
+  rules:
+  - host: service-frontend.cluster-ingress-subdomain
+    http:
+      paths:
+      - backend:
+          serviceName: service-frontend-cip
+          servicePort: 80
+        path: /
+  tls:
+  - hosts:
+    - service-frontend.cluster-ingress-subdomain
+    secretName: cluster-ingress-secret

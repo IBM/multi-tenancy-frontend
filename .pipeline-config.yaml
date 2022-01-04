@@ -1,0 +1,104 @@
+version: '1'
+
+setup:
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+
+    source ci-cd-scripts/code_setup.sh
+
+test:
+  abort_on_failure: false
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+
+    cd ../"$(load_repo app-repo path)"
+    exit 0
+
+static-scan:
+  abort_on_failure: false
+  dind: true
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+    if [ -z "$(get_env opt-in-sonar "")" ]; then
+      echo "If you want to enable this stage, add 'opt-in-sonar' parameter to your pipeline with any value." >&2
+    else
+      chmod 777 ci-cd-scripts/sonarqube/sonarqube_run
+      ci-cd-scripts/sonarqube/sonarqube_run
+    fi
+
+containerize:
+  dind: true
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+
+    if [[ "$PIPELINE_DEBUG" == 1 ]]; then
+      trap env EXIT
+      env
+      set -x
+    fi
+
+    source ci-cd-scripts/build_setup.sh
+    source ci-cd-scripts/build.sh
+
+deploy:
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+
+    if [[ "$PIPELINE_DEBUG" == 1 ]]; then
+      trap env EXIT
+      env
+      set -x
+    fi
+
+    source ci-cd-scripts/deploy_setup.sh
+    source ci-cd-scripts/deploy.sh
+
+sign-artifact:
+  abort_on_failure: false
+  image: icr.io/continuous-delivery/pipeline/image-signing:1.0.0@sha256:e9d8e354668ba3d40be2aaee08298d2aa7f0e1c8a1829cca4094ec93830e3e6a
+  script: |
+      #!/usr/bin/env bash
+      STAGE_DIND="true"
+      STAGE_ABORT_ON_FAILURE="false"
+      STAGE_IMAGE_PULL_POLICY="IfNotPresent"
+
+      source ci-cd-scripts/sign_image.sh
+
+acceptance-test:
+  abort_on_failure: false
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+    
+    exit 0
+
+release:
+  abort_on_failure: false
+  image: icr.io/continuous-delivery/toolchains/devsecops/compliance-baseimage:2.26.1@sha256:a780174a64474187b01b5e40a1721d8307f02897ac6f3eba2d482d4f4926edf1
+  script: |
+    #!/usr/bin/env bash
+
+    source ci-cd-scripts/release.sh
+
+scan-artifact:
+  abort_on_failure: false
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.6@sha256:7f588468622a981f89cf5e1212aaf75fface9da6169b5345ca52ab63d8215907
+  script: |
+    #!/usr/bin/env bash
+
+    source ci-cd-scripts/va_scan.sh
+
+dynamic-scan: 
+  abort_on_failure: false
+  image: icr.io/continuous-delivery/pipeline/pipeline-base-image:2.12@sha256:ff4053b0bca784d6d105fee1d008cfb20db206011453071e86b69ca3fde706a4
+  script: |
+    #!/usr/bin/env bash
+    echo "Dynamic Application Scan is in feature preview mode."
+    echo "To setup dynamic scan for your app follow the documentation at https://cloud.ibm.com/docs/devsecops?topic=devsecops-custom-scripts."
+
+

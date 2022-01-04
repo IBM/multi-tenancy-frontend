@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+
+source "${ONE_PIPELINE_PATH}/tools/retry"
+
+
+curl_admin() {
+  curl --fail --silent --show-error --location -K- <<< "-u ${SONAR_USER}:${SONAR_PASS}" "$@"
+}
+
+get_system_status() {
+  curl_admin --max-time 5 "${SONAR_HOST_URL}/api/system/status" | jq -r .status
+}
+
+sonarqube_status_check() {
+  local -i attempt=1
+  local -i -r retry_sleep=$(get_env "static-scan-retry-sleep" 10)
+  local -i -r retry_count=$(get_env "static-scan-retry-count" 30)
+  local SONAR_HEALTH
+
+  SONAR_HEALTH=$(get_system_status)
+
+  while [[ "$SONAR_HEALTH" != "UP" ]]; do
+    if [ $attempt -eq "$retry_count" ]; then
+      echo -e "\nAttempt $attempt. failed and there are no more attempts left, SonarQube is not up or the given credentials are not valid." >&2
+      exit 1
+    fi
+
+    echo "$attempt. attempt checking SonarQube startup failed... Retry in ${retry_sleep}s..." >&2
+    sleep "$retry_sleep"
+    SONAR_HEALTH=$(get_system_status)
+    ((attempt++))
+  done
+
+  printf "\nSonarQube instance is up and running!\n" >&2
+}
+
+create_sonarqube_token() {
+  local -r TOKEN_NAME=$(date +%s%3N)
+
+  curl_admin -X POST "${SONAR_HOST_URL}/api/user_tokens/generate?name=${TOKEN_NAME}" | jq -r '.token' > /tmp/sonarqube-token
+
+  if [ -s /tmp/sonarqube-token ] && [ -z "$SONAR_CONFIGURED" ]; then
+    kubectl create secret generic "$SONAR_INSTANCE_NAME" --from-file=token=/tmp/sonarqube-token
+  fi
+}
+
+publish_sonar_to_doi() {
+  if [[ -n "$(get_env BREAK_GLASS "")" ]]; then
+    printf "Break-Glass mode is on, skipping pushing scan results to doi\n" >&2
+    return
+  fi
+
+  if [ -z "$DOI_TOOLCHAIN_ID" ]; then
+    DOI_TOOLCHAIN_ID=$(get_env TOOLCHAIN_ID)
+  fi
+
+  local -r ibmcloud_api=$(get_env ibmcloud-api "https://cloud.ibm.com")
+  local -r buildnumber="$(get_env doi-buildnumber "$BUILD_NUMBER")"
+  local -r logicalappname="$(get_env doi-logicalappname "$name")"
+
+  # Use `doi-ibmcloud-api-key` if present, if not, fall back to `ibmcloud-api-key`
+  ibmcloud_api_key_name="/config/ibmcloud-api-key"
+  if [[ -s "/config/doi-ibmcloud-api-key" ]]; then
+    ibmcloud_api_key_name="/config/doi-ibmcloud-api-key"
+  fi
+
+  retry 5 2 \
+    ibmcloud login -r "$IBMCLOUD_IKS_REGION" --apikey @"$ibmcloud_api_key_name" -a "$ibmcloud_api"
+
+  retry 5 5 \
+    ibmcloud doi publishtestrecord \
+    --logicalappname "$logicalappname" \
+    --buildnumber "$buildnumber" \
+    --toolchainid="$DOI_TOOLCHAIN_ID" \
+    --filelocation ".scannerwork/report-task.txt" \
+    --type sonarqube \
+    --sqtoken "$(cat /tmp/sonarqube-token)"
+}
+
+printf "\n\nSonarQube Status Check" >&2
+printf "\n=====================\n\n" >&2
+sonarqube_status_check
+
+if [ ! -f /tmp/sonarqube-token ]; then
+  printf "\n\nCreate SonarQube Token" >&2
+  printf "\n=====================\n\n" >&2
+  create_sonarqube_token
+fi
+
+list_repos | while IFS= read -r repo ; do
+  url="$(load_repo "$repo" url)"
+  name=$(echo "$url" | cut -f5 -d/)
+
+  path="$(load_repo "$repo" path)"
+
+  mkdir -p "${WORKSPACE}/__sonar_scan__/$name"
+  SONAR_DIR="${WORKSPACE}/__sonar_scan__/$name"
+
+  printf "\n\nScanner" >&2
+  printf "\n=====================\n\n" >&2
+  cd "$WORKSPACE"/"$path" || exit
+  docker run --network host  -v "$WORKSPACE"/"$path":/usr/src sonarsource/sonar-scanner-cli:4.5 sonar-scanner
+
+  SONAR_PROJECT_KEY=$(< "$WORKSPACE"/"$path"/sonar-project.properties grep sonar.projectKey | cut -d "=" -f2)
+
+  printf "\n\nIssues" >&2
+  printf "\n=====================\n\n" >&2
+  PROJECT_ISSUES=$(curl_admin "${SONAR_HOST_URL}/api/issues/search?componentKeys=${SONAR_PROJECT_KEY}")
+  echo "$PROJECT_ISSUES" | jq '.'
+
+  printf "\n\nQuality gate status" >&2
+  printf "\n======================\n\n" >&2
+  PROJECT_STATUS=$(curl_admin "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}")
+  echo "$PROJECT_STATUS" | jq '.'
+
+  printf "\n\nPublish to DOI" >&2
+  printf "\n======================\n\n" >&2
+  publish_sonar_to_doi
+
+  # export results
+  echo "$PROJECT_ISSUES" | jq '.' > "${SONAR_DIR}/app_issues"
+  echo "$PROJECT_STATUS" | jq '.' > "${SONAR_DIR}/app_quality_status"
+
+  #
+  # store result and attachment for asset-based evidence locker
+  #
+  stage_name="static_scan"
+
+  save_result static-scan "${SONAR_DIR}/app_issues"
+  save_result "${repo}-${stage_name}-attachments" "${SONAR_DIR}/app_issues"
+  save_result static-scan "${SONAR_DIR}/app_quality_status"
+  save_result "${repo}-${stage_name}-attachments" "${SONAR_DIR}/app_quality_status"
+
+  if [ -s "${SONAR_DIR}/app_issues" ]; then
+    save_result static-scan "${SONAR_DIR}/app_issues"
+    save_result "${repo}-${stage_name}-attachments" "${SONAR_DIR}/app_issues"
+  fi
+  if [ -s "${SONAR_DIR}/app_quality_status" ]; then
+    save_result static-scan "${SONAR_DIR}/app_quality_status"
+    save_result "${repo}-${stage_name}-attachments" "${SONAR_DIR}/app_issues"
+  fi
+  STATIC_SCAN_STATUS=$(echo "$PROJECT_STATUS" | jq -r '.projectStatus.status' )
+  if [[ "${STATIC_SCAN_STATUS}" = "OK" ]] || [[ "${STATIC_SCAN_STATUS}" = "NONE" ]] || [[ "${STATIC_SCAN_STATUS}" = "WARN" ]]; then
+    STATIC_SCAN_STATUS_SUM+=0
+    save_repo "${repo}" "${stage_name}-result=0"
+  else
+    STATIC_SCAN_STATUS_SUM+=1
+    save_repo "${repo}" "${stage_name}-result=1"
+  fi
+
+  echo "$STATIC_SCAN_STATUS_SUM" > /tmp/static-scan-status
+done
+
+unset SONAR_PASS
+
+if [ -n "$SONAR_POD_NAME" ]; then
+  printf "\n\n======================\n" >&2
+  printf "You can connect to SonarQube by port-forwarding." >&2
+  printf "\nFor example you can access SonarQube at %s after running the following command on your computer: " "$SONAR_HOST_URL" >&2
+  printf "\nkubectl port-forward --address 0.0.0.0 pod/%s 9001:9000\n" "$SONAR_POD_NAME" >&2
+  printf "\n\nthe default username/password is admin/admin, if not set otherwise" >&2
+  printf "\n======================" >&2
+else
+  printf "\n\n======================\n" >&2
+  printf "SonarQube is available at: %s" "$SONAR_HOST_URL" >&2
+  printf "\n======================" >&2
+fi
+STATIC_SCAN_SUM=$(cat /tmp/static-scan-status)
+
+if [[ "$STATIC_SCAN_SUM" == *"1"* ]]; then
+  exit 1
+else
+  exit 0
+fi
