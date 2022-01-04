@@ -77,7 +77,8 @@ APPID_TENANT_ID=$(cat ./appid-key-temp.json | jq '.[].credentials.tenantId' | se
 APPID_MANAGEMENT_URL=$(cat ./appid-key-temp.json | jq '.[].credentials.managementUrl' | sed 's/"//g' )
 
 OAUTHTOKEN=$(ibmcloud iam oauth-tokens | awk '{print $4;}')
-APPID_MANAGEMENT_URL_ALL_APPLICATIONS=${APPID_MANAGEMENT_URL}/managememt/v4/${APPID_TENANT_ID}/applications
+echo $OAUTHTOKEN
+APPID_MANAGEMENT_URL_ALL_APPLICATIONS=${APPID_MANAGEMENT_URL}/applications
 echo $APPID_MANAGEMENT_URL_ALL_APPLICATIONS
 result=$(curl -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_APPLICATIONS)
 echo $result
