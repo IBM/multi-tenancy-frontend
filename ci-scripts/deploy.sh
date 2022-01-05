@@ -157,10 +157,17 @@ echo "Application URL: http://${IP_ADDRESS}:${PORT}"
 
 #####################
 
-CURRENT_REDIRECT_URIS=$(curl -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
+OAUTHTOKEN=$(ibmcloud iam oauth-tokens | awk '{print $4;}')
+echo $OAUTHTOKEN
+
+echo APPID_MANAGEMENT_URL
+echo ${APPID_MANAGEMENT_URL}
+CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" ${APPID_MANAGEMENT_URL}/config/redirect_uris)
+echo "niklas here"
 echo $CURRENT_REDIRECT_URIS
 
 FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
 
+echo "adam here"
 echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_URL\"'] + .' > ./new-redirects.json
-result=$(curl -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
+result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" ${APPID_MANAGEMENT_URL}/config/redirect_uris)
