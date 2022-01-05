@@ -162,7 +162,9 @@ echo $OAUTHTOKEN
 
 echo APPID_MANAGEMENT_URL
 echo ${APPID_MANAGEMENT_URL}
-CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" ${APPID_MANAGEMENT_URL}/config/redirect_uris)
+APPID_MANAGEMENT_URL_ALL_REDIRECTS=${APPID_MANAGEMENT_URL}/config/redirect_uris
+echo $APPID_MANAGEMENT_URL_ALL_REDIRECTS
+CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
 echo "niklas here"
 echo $CURRENT_REDIRECT_URIS
 
@@ -170,4 +172,4 @@ FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
 
 echo "adam here"
 echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_URL\"'] + .' > ./new-redirects.json
-result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" ${APPID_MANAGEMENT_URL}/config/redirect_uris)
+result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
