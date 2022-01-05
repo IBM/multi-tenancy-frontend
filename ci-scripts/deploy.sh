@@ -77,7 +77,7 @@ APPID_TENANT_ID=$(cat ./appid-key-temp.json | jq '.[].credentials.tenantId' | se
 APPID_MANAGEMENT_URL=$(cat ./appid-key-temp.json | jq '.[].credentials.managementUrl' | sed 's/"//g' )
 
 OAUTHTOKEN=$(ibmcloud iam oauth-tokens | awk '{print $4;}')
-echo $OAUTHTOKEN
+#echo $OAUTHTOKEN
 APPID_MANAGEMENT_URL_ALL_APPLICATIONS=${APPID_MANAGEMENT_URL}/applications
 echo $APPID_MANAGEMENT_URL_ALL_APPLICATIONS
 result=$(curl -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_APPLICATIONS)
@@ -153,10 +153,19 @@ fi
 
 IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
 PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
-
 echo "Application URL: http://${IP_ADDRESS}:${PORT}"
 
+#####################
+
 ADD_REDIRECT_URIS="add-redirecturis.json"
+result=$(curl -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
+#echo $result > ./$ADD_REDIRECT_URIS
+
+echo $OAUTHTOKEN
+result=$(curl -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_APPLICATIONS)
+echo $result
+
+
 FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
 sed "s+APPLICATION_REDIRECT_URL+$FRONTEND_URL+g" ./deployments/add-redirecturis-template.json > ./$ADD_REDIRECT_URIS
 result=$(curl -d @./$ADD_REDIRECT_URIS -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
