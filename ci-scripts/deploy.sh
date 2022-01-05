@@ -157,15 +157,10 @@ echo "Application URL: http://${IP_ADDRESS}:${PORT}"
 
 #####################
 
-ADD_REDIRECT_URIS="add-redirecturis.json"
-result=$(curl -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
-#echo $result > ./$ADD_REDIRECT_URIS
-
-echo $OAUTHTOKEN
-result=$(curl -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_APPLICATIONS)
-echo $result
-
+CURRENT_REDIRECT_URIS=$(curl -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
+echo $CURRENT_REDIRECT_URIS
 
 FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
-sed "s+APPLICATION_REDIRECT_URL+$FRONTEND_URL+g" ./deployments/add-redirecturis-template.json > ./$ADD_REDIRECT_URIS
-result=$(curl -d @./$ADD_REDIRECT_URIS -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
+
+echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_URL\"'] + .' > ./new-redirects.json
+result=$(curl -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL/config/redirect_uris)
