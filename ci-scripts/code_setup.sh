@@ -22,5 +22,5 @@ cd multi-tenancy
 GIT_COMMIT=$(git rev-parse HEAD)
 
 save_repo multi-tenancy "url=${PARENT}"
-save_repo multi-tenancy "branch=master"
+save_repo multi-tenancy "branch=main"
 save_repo multi-tenancy "commit=${GIT_COMMIT}"
