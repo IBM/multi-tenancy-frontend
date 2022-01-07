@@ -132,6 +132,35 @@ rm ${YAML_FILE}
 sed "s#VUE_APP_HEADLINE_VALUE#${APPLICATION_CONTAINER_NAME_FRONTEND_TEMP}#g" "${YAML_FILE}tmp" > ${YAML_FILE}
 rm "${YAML_FILE}tmp"
 
+
+PLATFORM_NAME="$(get_env PLATFORM_NAME)"
+if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
+    HOST=$(ibmcloud ks cluster get --c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
+else
+    #TODO rework HOST this with jq
+    HOST=$(ibmcloud oc cluster get -c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | grep "hostname" | awk '{print $2;}'| sed 's/"//g' | sed 's/,//g')
+    #With OpenShift, TLS secret for default Ingress subdomain only exists in project openshift-ingress, so need to extract and re-create in tenant project
+    TLS_SECRET_NAME=$(echo $HOST| cut -d'.' -f 1)
+    echo "Openshift TLS_SECRET_NAME=$TLS_SECRET_NAME"
+    oc extract secret/"$TLS_SECRET_NAME" --to=. -n openshift-ingress
+    oc create secret tls cluster-ingress-secret -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" --cert tls.crt --key tls.key
+    rm tls.crt tls.key
+fi
+
+#Update the kubernetes deployment descriptor
+HOST_HTTP=${HOST}
+HOST_TLS=${HOST}
+rm "${YAML_FILE}org"
+cp ${YAML_FILE} "${YAML_FILE}org"
+rm ${YAML_FILE}
+sed "s#HOST_HTTP#${HOST_HTTP}#g" "${YAML_FILE}org" > ${YAML_FILE}
+rm "${YAML_FILE}org"
+cp ${YAML_FILE} "${YAML_FILE}org"
+rm ${YAML_FILE}
+sed "s#HOST_TLS#${HOST_TLS}#g" "${YAML_FILE}org" > ${YAML_FILE}
+cat ${YAML_FILE}
+
+
 #####################
 
 kubectl apply --namespace "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" -f ${YAML_FILE}
@@ -151,9 +180,19 @@ if [ "$status" = failure ]; then
   exit 1
 fi
 
-IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
-PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
-echo "Application URL: http://${IP_ADDRESS}:${PORT}"
+#IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
+#PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
+#echo "Application URL: http://${IP_ADDRESS}:${PORT}"
+
+
+if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
+  #IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
+  #PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
+  echo "IKS Application Frontend URL (via Ingress): http://${HOST}/frontend"
+else
+  echo "OpenShift Application Frontend REST URL (via Ingress): http://${HOST}/frontend"
+fi
+
 
 #####################
 

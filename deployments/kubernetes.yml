@@ -49,6 +49,20 @@ spec:
             command: ["sh", "-c", "curl -s http://localhost:8080"]
           initialDelaySeconds: 40
       restartPolicy: Always     
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: service-frontend
+#  labels:
+#    app: service-frontend
+#spec:
+#  type: NodePort
+#  ports:
+#    - port: 8080
+#      name: http
+#  selector:
+#    app: service-frontend
 ---
 apiVersion: v1
 kind: Service
@@ -56,20 +70,6 @@ metadata:
   name: service-frontend
   labels:
     app: service-frontend
-spec:
-  type: NodePort
-  ports:
-    - port: 8080
-      name: http
-  selector:
-    app: service-frontend
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: service-frontend-cip
-  labels:
-    app: service-frontend-cip
 spec:
   type: ClusterIP
   ports:
@@ -78,20 +78,41 @@ spec:
   selector:
     app: service-frontend
 ---
-apiVersion: networking.k8s.io/v1beta1
+#apiVersion: networking.k8s.io/v1beta1
+#kind: Ingress
+#metadata:
+#  name: service-frontend
+#spec:
+#  rules:
+#  - host: service-frontend.cluster-ingress-subdomain
+#    http:
+#      paths:
+#      - backend:
+#          serviceName: service-frontend-cip
+#          servicePort: 80
+#        path: /
+#  tls:
+#  - hosts:
+#    - service-frontend.cluster-ingress-subdomain
+#    secretName: cluster-ingress-secret
+
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: service-frontend
+  name: service-frontend 
 spec:
-  rules:
-  - host: service-frontend.cluster-ingress-subdomain
-    http:
-      paths:
-      - backend:
-          serviceName: service-frontend-cip
-          servicePort: 80
-        path: /
   tls:
   - hosts:
-    - service-frontend.cluster-ingress-subdomain
+    - HOST_TLS
     secretName: cluster-ingress-secret
+  rules:
+  - host: HOST_HTTP
+    http:
+      paths:
+      - path: /frontend
+        backend:
+          service:
+            name: service-frontend
+            port: 
+              number: 80
+        pathType: ImplementationSpecific
