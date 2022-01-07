@@ -135,7 +135,7 @@ rm "${YAML_FILE}tmp"
 
 PLATFORM_NAME="$(get_env PLATFORM_NAME)"
 if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
-    HOST=$(ibmcloud ks cluster get --c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
+    HOST=$(ibmcloud ks cluster get --c $(get_env IBM_KUBERNETES_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
 else
     #TODO rework HOST this with jq
     HOST=$(ibmcloud oc cluster get -c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | grep "hostname" | awk '{print $2;}'| sed 's/"//g' | sed 's/,//g')
