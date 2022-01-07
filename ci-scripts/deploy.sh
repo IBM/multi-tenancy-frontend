@@ -96,9 +96,28 @@ kubectl create secret generic appid.client-id-fronted \
 
 #####################
 
-BACKEND_IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
-BACKEND_PORT=$(kubectl get service -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "service-backend" -o json | jq -r '.spec.ports[0].nodePort')
-SERVICE_CATALOG_URL="http://${BACKEND_IP_ADDRESS}:${BACKEND_PORT}"
+#BACKEND_IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
+#BACKEND_PORT=$(kubectl get service -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "service-backend" -o json | jq -r '.spec.ports[0].nodePort')
+
+PLATFORM_NAME="$(get_env PLATFORM_NAME)"
+if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
+    HOST=$(ibmcloud ks cluster get --c $(get_env IBM_KUBERNETES_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
+else
+    #TODO rework HOST this with jq
+    HOST=$(ibmcloud oc cluster get -c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | grep "hostname" | awk '{print $2;}'| sed 's/"//g' | sed 's/,//g')
+    #With OpenShift, TLS secret for default Ingress subdomain only exists in project openshift-ingress, so need to extract and re-create in tenant project
+    TLS_SECRET_NAME=$(echo $HOST| cut -d'.' -f 1)
+    echo "Openshift TLS_SECRET_NAME=$TLS_SECRET_NAME"
+    oc extract secret/"$TLS_SECRET_NAME" --to=. -n openshift-ingress
+    oc create secret tls cluster-ingress-secret -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" --cert tls.crt --key tls.key
+    rm tls.crt tls.key
+fi
+
+echo "HOST=$HOST"
+
+#SERVICE_CATALOG_URL="http://${BACKEND_IP_ADDRESS}:${BACKEND_PORT}"
+
+SERVICE_CATALOG_URL="http://${HOST}/backend"
 
 #####################
 
@@ -133,21 +152,7 @@ sed "s#VUE_APP_HEADLINE_VALUE#${APPLICATION_CONTAINER_NAME_FRONTEND_TEMP}#g" "${
 rm "${YAML_FILE}tmp"
 
 
-PLATFORM_NAME="$(get_env PLATFORM_NAME)"
-if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
-    HOST=$(ibmcloud ks cluster get --c $(get_env IBM_KUBERNETES_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
-else
-    #TODO rework HOST this with jq
-    HOST=$(ibmcloud oc cluster get -c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | grep "hostname" | awk '{print $2;}'| sed 's/"//g' | sed 's/,//g')
-    #With OpenShift, TLS secret for default Ingress subdomain only exists in project openshift-ingress, so need to extract and re-create in tenant project
-    TLS_SECRET_NAME=$(echo $HOST| cut -d'.' -f 1)
-    echo "Openshift TLS_SECRET_NAME=$TLS_SECRET_NAME"
-    oc extract secret/"$TLS_SECRET_NAME" --to=. -n openshift-ingress
-    oc create secret tls cluster-ingress-secret -n "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" --cert tls.crt --key tls.key
-    rm tls.crt tls.key
-fi
 
-echo "HOST=$HOST"
 
 #Update the kubernetes deployment descriptor
 HOST_HTTP=${HOST}
