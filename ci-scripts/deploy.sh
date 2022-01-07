@@ -147,6 +147,8 @@ else
     rm tls.crt tls.key
 fi
 
+echo "HOST=$HOST"
+
 #Update the kubernetes deployment descriptor
 HOST_HTTP=${HOST}
 HOST_TLS=${HOST}
