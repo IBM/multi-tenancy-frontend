@@ -17,7 +17,7 @@ fi
 
 export COMMIT_SHA="$(cat /config/git-commit)"
 #export APP_NAME="$(cat /config/app-name)"
-export APP_NAME=${IMAGES_NAME_BACKEND}
+export APP_NAME=${IMAGES_NAME_FRONTEND}
 
 INVENTORY_REPO="$(cat /config/inventory-url)"
 GHE_ORG=${INVENTORY_REPO%/*}
@@ -42,7 +42,7 @@ else
     APP_REPO_NAME=${APP_REPO##*/}
     export APP_REPO_NAME=${APP_REPO_NAME%.git}
 fi
-APP_NAME=$(get_env "IMAGES_NAME_BACKEND")
+APP_NAME=$(get_env "IMAGES_NAME_FRONTEND")
 
 if [ "$SCM_TYPE" == "gitlab" ]; then
     id=$(curl --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" ${SCM_API_URL}/projects/${APP_REPO_ORG}%2F${APP_REPO_NAME} | jq .id)
