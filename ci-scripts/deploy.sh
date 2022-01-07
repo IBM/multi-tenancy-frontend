@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 if kubectl get namespace "$IBMCLOUD_IKS_CLUSTER_NAMESPACE"; then
   echo "Namespace ${IBMCLOUD_IKS_CLUSTER_NAMESPACE} found!"
 else
