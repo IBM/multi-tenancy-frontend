@@ -195,12 +195,12 @@ fi
 if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
   IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
   PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
-  echo "IKS Application Frontend URL (via NodePort): http://${HOST}:${PORT}"
+  echo "IKS Application Frontend URL (via NodePort): http://${IP_ADDRESS}:${PORT}"
   #echo "IKS Application Frontend URL (via Ingress): http://${HOST}/frontend"
 else
   IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
   PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
-  echo "OpenShift Application Frontend URL (via NodePort): http://${HOST}:${PORT}"
+  echo "OpenShift Application Frontend URL (via NodePort): http://${IP_ADDRESS}:${PORT}"
   #echo "OpenShift Application Frontend REST URL (via Ingress): http://${HOST}/frontend"
 fi
 
