@@ -115,9 +115,9 @@ fi
 
 echo "HOST=$HOST"
 
-#SERVICE_CATALOG_URL="http://${BACKEND_IP_ADDRESS}:${BACKEND_PORT}"
+SERVICE_CATALOG_URL="http://${BACKEND_IP_ADDRESS}:${BACKEND_PORT}"
 
-SERVICE_CATALOG_URL="http://${HOST}/backend"
+#SERVICE_CATALOG_URL="http://${HOST}/backend"
 
 #####################
 
