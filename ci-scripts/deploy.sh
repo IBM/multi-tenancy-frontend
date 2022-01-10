@@ -100,7 +100,8 @@ kubectl create secret generic appid.client-id-fronted \
 
 PLATFORM_NAME="$(get_env PLATFORM_NAME)"
 if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
-    HOST=$(ibmcloud ks cluster get --c $(get_env IBM_KUBERNETES_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
+    #HOST=$(ibmcloud ks cluster get --c $(get_env IBM_KUBERNETES_SERVICE_NAME) --output json | jq -r '[.ingressHostname] | .[0]')
+    HOST="service-frontend.cluster-ingress-subdomain"
 else
     #TODO rework HOST this with jq
     HOST=$(ibmcloud oc cluster get -c $(get_env IBM_OPENSHIFT_SERVICE_NAME) --output json | grep "hostname" | awk '{print $2;}'| sed 's/"//g' | sed 's/,//g')
@@ -192,11 +193,15 @@ fi
 
 
 if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
-  #IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
-  #PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
-  echo "IKS Application Frontend URL (via Ingress): http://${HOST}/frontend"
+  IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
+  PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
+  echo "IKS Application Frontend URL (via NodePort): http://${HOST}:${PORT}"
+  #echo "IKS Application Frontend URL (via Ingress): http://${HOST}/frontend"
 else
-  echo "OpenShift Application Frontend REST URL (via Ingress): http://${HOST}/frontend"
+  IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
+  PORT=$(kubectl get service -n  "$IBMCLOUD_IKS_CLUSTER_NAMESPACE" "$service_name" -o json | jq -r '.spec.ports[0].nodePort')
+  echo "OpenShift Application Frontend URL (via NodePort): http://${HOST}:${PORT}"
+  #echo "OpenShift Application Frontend REST URL (via Ingress): http://${HOST}/frontend"
 fi
 
 
