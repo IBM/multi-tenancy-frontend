@@ -84,7 +84,7 @@ metadata:
   name: service-frontend
 spec:
   rules:
-  - host: HOST
+  - host: service-frontend.cluster-ingress-subdomain
     http:
       paths:
       - backend:
@@ -93,7 +93,7 @@ spec:
         path: /
   tls:
   - hosts:
-    - HOST_TLS
+    - service-frontend.cluster-ingress-subdomain
     secretName: cluster-ingress-secret
 
 
