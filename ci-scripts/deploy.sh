@@ -305,11 +305,9 @@ echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_NODEPORT_URL
 result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
 
 #Is there also an Ingress URL for frontend?
-if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
 if [ ! -z "${APPURL}" ]; then
-{
   echo "Adding the following URL to AppID redirect URLs: https://${APPURL}"
   CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
   echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$APPURL\"'] + .' > ./new-redirects.json
   result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
-}
+fi
