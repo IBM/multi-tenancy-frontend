@@ -276,6 +276,19 @@ if [ ! -z "${CLUSTER_INGRESS_SUBDOMAIN}" ] && [ "${KEEP_INGRESS_CUSTOM_DOMAIN}" 
     echo -n https://${APPURL} > ../app-url
   fi
 
+# Add Ingress redirect URL
+OAUTHTOKEN=$(ibmcloud iam oauth-tokens | awk '{print $4;}')
+#echo $OAUTHTOKEN
+APPID_MANAGEMENT_URL_ALL_REDIRECTS=${APPID_MANAGEMENT_URL}/config/redirect_uris
+#echo $APPID_MANAGEMENT_URL_ALL_REDIRECTS
+CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
+#echo $CURRENT_REDIRECT_URIS
+FRONTEND_URL="http://${APPURL}"
+echo "Adding the following URL to AppID redirect URLs: https://${FRONTEND_NODEPORT_URL}"
+echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_URL\"'] + .' > ./new-redirects.json
+result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
+
+
 else 
   if [ "$PLATFORM_NAME" = "IBM_KUBERNETES_SERVICE" ]; then
     IP_ADDRESS=$(kubectl get nodes -o json | jq -r '[.items[] | .status.addresses[] | select(.type == "ExternalIP") | .address] | .[0]')
@@ -289,25 +302,19 @@ else
     echo "N.B This URL will not work unless you are connected to IBM Cloud via VPN, because OpenShift workers do not have a public IP"
     #echo "OpenShift Application Frontend REST URL (via Ingress): http://${HOST}/frontend"
   fi
-fi
 
-#####################
-
-OAUTHTOKEN=$(ibmcloud iam oauth-tokens | awk '{print $4;}')
-#echo $OAUTHTOKEN
-APPID_MANAGEMENT_URL_ALL_REDIRECTS=${APPID_MANAGEMENT_URL}/config/redirect_uris
-#echo $APPID_MANAGEMENT_URL_ALL_REDIRECTS
-CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
-#echo $CURRENT_REDIRECT_URIS
-FRONTEND_NODEPORT_URL="http://${IP_ADDRESS}:${PORT}"
-echo "Adding the following URL to AppID redirect URLs: https://${FRONTEND_NODEPORT_URL}"
-echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_NODEPORT_URL\"'] + .' > ./new-redirects.json
-result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
-
-#Is there also an Ingress URL for frontend?
-if [ ! -z "${APPURL}" ]; then
-  echo "Adding the following URL to AppID redirect URLs: https://${APPURL}"
+  # Add NodePort redirect URL
+  OAUTHTOKEN=$(ibmcloud iam oauth-tokens | awk '{print $4;}')
+  #echo $OAUTHTOKEN
+  APPID_MANAGEMENT_URL_ALL_REDIRECTS=${APPID_MANAGEMENT_URL}/config/redirect_uris
+  #echo $APPID_MANAGEMENT_URL_ALL_REDIRECTS
   CURRENT_REDIRECT_URIS=$(curl -v -H "Content-Type: application/json" -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
-  echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$APPURL\"'] + .' > ./new-redirects.json
+  #echo $CURRENT_REDIRECT_URIS
+  FRONTEND_URL="http://${IP_ADDRESS}:${PORT}"
+  echo "Adding the following URL to AppID redirect URLs: https://${FRONTEND_URL}"
+  echo $CURRENT_REDIRECT_URIS | jq -r '.redirectUris |= ['\"$FRONTEND_NODEPORT_URL\"'] + .' > ./new-redirects.json
   result=$(curl -v -d @./new-redirects.json -H "Content-Type: application/json" -X PUT -H "Authorization: Bearer $OAUTHTOKEN" $APPID_MANAGEMENT_URL_ALL_REDIRECTS)
+
+
 fi
+
